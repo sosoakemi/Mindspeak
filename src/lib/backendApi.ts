@@ -252,8 +252,29 @@ export function createSession(payload: {
 
 export function listPatientSessions(
   patientId: number,
+  options: { limit?: number; cursor?: string } = {},
 ): Promise<{ items: BackendSession[]; next_cursor: string | null }> {
-  return getJson(`/patients/${patientId}/sessions`)
+  const params = new URLSearchParams()
+  if (options.limit) params.set('limit', String(options.limit))
+  if (options.cursor) params.set('cursor', options.cursor)
+  const query = params.toString()
+  return getJson(`/patients/${patientId}/sessions${query ? `?${query}` : ''}`)
+}
+
+export type SignalInterruption = {
+  kind: 'sinal_ruim' | 'esense_degenerado'
+  started_at: string
+  ended_at: string
+  duration_seconds: number
+  missed_frames: number
+}
+
+// Reconstruído das leituras já gravadas pelo backend, não de um evento
+// dedicado — ver list_session_signal_interruptions no backend. Só
+// episódios com leitura boa depois entram na lista: um trecho que nunca
+// se resolveu antes da sessão acabar não tem duração que dê pra medir.
+export function listSessionSignalInterruptions(sessionId: number): Promise<SignalInterruption[]> {
+  return getJson(`/sessions/${sessionId}/signal-interruptions`)
 }
 
 export function startCalibrationCapture(
