@@ -14,7 +14,7 @@ import { getPhraseVisual } from './patientPhraseIcons'
 import { getPatientSession } from '../../lib/patientSession'
 import { getPatientPreferences } from '../../lib/patientPreferences'
 import { isSpeechSupported, listVoices, primeSpeech, speakTextAI } from '../../lib/speech'
-import { skipToNextWord } from '../../lib/backendApi'
+import { skipToNextWord, triggerFallbackConfirm } from '../../lib/backendApi'
 import { incrementTodaySelectionCount } from '../../lib/patientStats'
 import { MindSpeakLogo } from '../../components/brand/MindSpeakLogo'
 import { Button } from '../../components/shared/Button'
@@ -106,6 +106,7 @@ export function PatientCommunicatePage() {
   // Evita disparar dois skips em voo ao mesmo tempo; como não há mais botão
   // pra desabilitar, isto não precisa ser estado de render.
   const skippingRef = useRef(false)
+  const confirmingRef = useRef(false)
   const sessionDbIdRef = useRef<number | null>(null)
   phrasesRef.current = phrases
   scanIndexRef.current = scanIndex
@@ -352,13 +353,37 @@ export function PatientCommunicatePage() {
       })
   }, [isLive])
 
-  // Atalhos de teclado. 'A' confirma na hora a palavra destacada, com o
-  // mesmo retorno da confirmação por foco (overlay, card piscando, contagem
-  // do dia); 'C' só adianta a varredura. Os dois exigem varredura rodando —
-  // sem destaque na tela não há o que confirmar nem de onde avançar — e
-  // ficam inertes enquanto uma confirmação está na tela, pra não mexer no
-  // destaque congelado por trás do overlay. O resto dos guardas (cooldown)
-  // fica por conta do próprio confirmSelection.
+  // Confirmação manual em sessão ao vivo: diferente do modo demo, não
+  // atualiza o estado local direto — vai pelo backend, que anuncia a
+  // palavra pelo /ws/status pra QUALQUER tela conectada a esta sessão
+  // (PC que apertou a tecla, iPad que só está exibindo, etc.). Por isso
+  // não chama confirmSelection aqui: o retorno visual (overlay, fala)
+  // chega de volta pela própria conexão ao vivo deste dispositivo, igual
+  // uma seleção real do sensor chegaria — handleSpeakEvent já cobre isso.
+  const triggerLiveFallbackConfirm = useCallback(() => {
+    if (!sessionDbIdRef.current || confirmingRef.current) return
+    confirmingRef.current = true
+    triggerFallbackConfirm(sessionDbIdRef.current)
+      .catch(() => {
+        // falha de rede pontual — sem retry automático: é uma tecla de
+        // atalho, apertar de novo já tenta uma vez nova.
+      })
+      .finally(() => {
+        confirmingRef.current = false
+      })
+  }, [])
+
+  // Atalhos de teclado. 'C' só adianta a varredura. 'A' confirma a palavra
+  // destacada — mas o CAMINHO muda com o modo: no demo é 100% local
+  // (confirmSelection, sem backend nenhum pra conversar); em sessão ao
+  // vivo vai por triggerLiveFallbackConfirm, que anuncia pelo /ws/status
+  // e por isso aparece em QUALQUER tela conectada a esta sessão (não só
+  // na que apertou a tecla) — sem gravar nada no histórico clínico. Os
+  // dois exigem varredura rodando — sem destaque na tela não há o que
+  // confirmar nem de onde avançar — e ficam inertes enquanto uma
+  // confirmação está na tela, pra não mexer no destaque congelado por
+  // trás do overlay. O resto dos guardas (cooldown) fica por conta do
+  // próprio confirmSelection, no caminho local.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.repeat) return
@@ -370,11 +395,16 @@ export function PatientCommunicatePage() {
         skipWord()
         return
       }
+      if (overlayBlockRef.current) return
+      if (isLive) {
+        triggerLiveFallbackConfirm()
+        return
+      }
       confirmSelection(scanningIndexRef.current, { fromSensor: false })
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [confirmSelection, skipWord])
+  }, [confirmSelection, isLive, skipWord, triggerLiveFallbackConfirm])
 
   const attClamped = isLive
     ? Math.min(100, Math.max(0, Math.round(live.focusLevel)))

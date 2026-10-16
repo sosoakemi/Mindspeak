@@ -192,6 +192,16 @@ export function skipToNextWord(sessionId: number): Promise<{ status: string }> {
   return postJson(`/sessions/${sessionId}/skip`, {}, true)
 }
 
+// Confirmação manual de contingência (tecla "A" em sessão ao vivo): anuncia
+// a palavra destacada pra quem estiver vendo esta sessão — qualquer tela
+// conectada ao /ws/status, não só quem apertou. NUNCA grava no histórico
+// clínico: não é o sensor decidindo, é um override manual assumido.
+export function triggerFallbackConfirm(
+  sessionId: number,
+): Promise<{ status: string; word_id?: string; text?: string }> {
+  return postJson(`/sessions/${sessionId}/fallback-confirm`, {}, true)
+}
+
 export function registerCaregiver(payload: {
   full_name: string
   email: string

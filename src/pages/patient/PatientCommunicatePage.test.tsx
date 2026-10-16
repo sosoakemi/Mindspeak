@@ -7,6 +7,27 @@ import { ThemeProvider } from '../../theme/ThemeProvider'
 import { savePatientSession } from '../../lib/patientSession'
 import { getEightPhrases } from '../../data/patientPhrases'
 import { getTodaySelectionCount } from '../../lib/patientStats'
+import * as backendApi from '../../lib/backendApi'
+import * as useLiveSessionModule from '../../hooks/useLiveSession'
+
+// Sessão ao vivo: o teste não abre WebSocket nenhum (não existe no jsdom),
+// então o hook é mockado com um estado "conectado" controlado — só o
+// suficiente pra isHighlighting virar true e sessionDbIdRef ter um valor.
+vi.mock('../../hooks/useLiveSession', () => ({
+  useLiveSession: vi.fn(),
+}))
+
+vi.mock('../../lib/backendApi', async () => {
+  const actual = await vi.importActual<typeof import('../../lib/backendApi')>('../../lib/backendApi')
+  return {
+    ...actual,
+    triggerFallbackConfirm: vi.fn(() => Promise.resolve({ status: 'ok' })),
+    skipToNextWord: vi.fn(() => Promise.resolve({ status: 'ok' })),
+  }
+})
+
+const api = vi.mocked(backendApi)
+const useLiveSessionMock = vi.mocked(useLiveSessionModule.useLiveSession)
 
 // A página fala por síntese de voz e abre WebSocket em sessão ao vivo —
 // nenhum dos dois existe no jsdom. Aqui só interessa o atalho de teclado.
@@ -37,17 +58,37 @@ window.matchMedia = window.matchMedia ?? ((query: string) => ({
 
 beforeEach(() => {
   localStorage.clear()
+  vi.clearAllMocks()
   savePatientSession({
     patientId: '1',
     patientName: 'Teste',
     connectedAt: new Date().toISOString(),
   })
+  // Default "idle" — as mesmas chaves de INITIAL_STATE no hook real. Os
+  // testes de modo demo nem olham pra isto (isLive é false, então o valor
+  // devolvido aqui não afeta o que a tela mostra); só o teste de sessão ao
+  // vivo sobrescreve com um estado "conectado".
+  useLiveSessionMock.mockReturnValue({
+    status: 'idle',
+    sessionDbId: null,
+    patientId: null,
+    words: [],
+    scanningIndex: 0,
+    focusLevel: 0,
+    signalQuality: 100,
+    candidateWord: null,
+    confidence: 0,
+    paused: false,
+    uncertain: false,
+    lastSelected: null,
+    spokenHistory: [],
+  })
 })
 
-function renderPage() {
+function renderPage(initialEntries: string[] = ['/patient/communicate']) {
   return render(
     <ThemeProvider>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={initialEntries}>
         <PatientCommunicatePage />
       </MemoryRouter>
     </ThemeProvider>,
@@ -105,5 +146,64 @@ describe('PatientCommunicatePage — atalho de confirmação', () => {
     await user.keyboard('aaa')
 
     await waitFor(() => expect(getTodaySelectionCount()).toBe(1))
+  })
+})
+
+describe('PatientCommunicatePage — tecla A em sessão ao vivo', () => {
+  it('anuncia pelo backend em vez de confirmar localmente', async () => {
+    useLiveSessionMock.mockReturnValue({
+      status: 'open',
+      sessionDbId: 123,
+      patientId: 1,
+      words: [{ id: 1, text: 'Água', severity: 'informativo', position: 1 }],
+      scanningIndex: 0,
+      focusLevel: 40,
+      signalQuality: 100,
+      candidateWord: 'Água',
+      confidence: 0.4,
+      paused: false,
+      uncertain: false,
+      lastSelected: null,
+      spokenHistory: [],
+    })
+    const user = userEvent.setup()
+    renderPage(['/patient/communicate?session=sess-ipad-001'])
+
+    await user.click(screen.getByRole('button', { name: /iniciar sessão ao vivo/i }))
+    await user.keyboard('a')
+
+    await waitFor(() => expect(api.triggerFallbackConfirm).toHaveBeenCalledWith(123))
+    // o retorno visual chega de volta pela conexão ao vivo (handleSpeakEvent),
+    // não por uma atualização local direta — por isso nenhum overlay aparece
+    // só de apertar a tecla, no mock que não simula a mensagem chegando.
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    // e continua sem gravar no contador local, já que o caminho ao vivo
+    // não chama confirmSelection/applyConfirmation.
+    expect(getTodaySelectionCount()).toBe(0)
+  })
+
+  it('não chama o backend sem a varredura estar rodando', async () => {
+    useLiveSessionMock.mockReturnValue({
+      status: 'open',
+      sessionDbId: 123,
+      patientId: 1,
+      words: [{ id: 1, text: 'Água', severity: 'informativo', position: 1 }],
+      scanningIndex: 0,
+      focusLevel: 40,
+      signalQuality: 100,
+      candidateWord: 'Água',
+      confidence: 0.4,
+      paused: false,
+      uncertain: false,
+      lastSelected: null,
+      spokenHistory: [],
+    })
+    const user = userEvent.setup()
+    renderPage(['/patient/communicate?session=sess-ipad-002'])
+
+    // sem clicar em "Iniciar sessão ao vivo" — liveStarted continua false.
+    await user.keyboard('a')
+
+    expect(api.triggerFallbackConfirm).not.toHaveBeenCalled()
   })
 })
