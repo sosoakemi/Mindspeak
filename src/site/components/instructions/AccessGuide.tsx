@@ -1,8 +1,13 @@
 import { KeyRound, ShieldCheck, UserPlus, Users } from 'lucide-react'
 import { Reveal } from '../Reveal'
 
-// Conteúdo tirado do manual (páginas 2-4: "tutorial portal clínico" e
-// "tutorial portal familiar") — como acessar/cadastrar em cada portal.
+// Reflete o fluxo real das telas (src/pages/access/AccessSelectionPage.tsx
+// e src/pages/auth/**) — não um roteiro de design antigo. Revisado em
+// 17/10/2026: a versão anterior descrevia campos que nunca existiram no
+// formulário real (ex.: "ID Profissional (CRM/COREN)" no login, "Cargo" e
+// "Registro Profissional (CRM/CRP)" no cadastro, "cadastro do paciente"
+// como 2ª etapa do cadastro familiar) — confundiria quem seguisse este
+// guia pra valer.
 const portals = [
   {
     id: 'clinico',
@@ -11,19 +16,13 @@ const portals = [
     icon: ShieldCheck,
     steps: [
       'Na página inicial, clique em "Login" e escolha "Portal Clínico".',
-      'Informe seu ID Profissional (CRM/COREN) e senha para entrar.',
-      'Sem conta ainda? Clique em "Criar conta" para se credenciar.',
+      'Informe seu e-mail e senha e clique em "Próximo passo" para entrar.',
+      'Sem conta ainda? Clique em "Criar conta" para se cadastrar.',
     ],
     signup: {
-      title: 'Credenciamento de Especialista',
-      fields: [
-        'Instituição de Saúde',
-        'Nome Completo',
-        'Cargo',
-        'Registro Profissional (CRM/CRP)',
-        'E-mail Institucional',
-      ],
-      note: 'Após enviar a solicitação, a verificação pode levar até 24h.',
+      title: 'Cadastro clínico',
+      fields: ['Nome completo', 'Instituição', 'E-mail profissional', 'Senha'],
+      note: 'Depois de preencher os dados, confirme os termos de uso para concluir o cadastro.',
     },
   },
   {
@@ -32,14 +31,14 @@ const portals = [
     audience: 'Responsáveis e familiares',
     icon: Users,
     steps: [
-      'Na página inicial, clique em "Login" e escolha "Acesso Familiar".',
-      'Informe e-mail e senha e clique em "Próximo Passo" para entrar.',
+      'Na página inicial, clique em "Login" e escolha "Portal Familiar".',
+      'Informe e-mail e senha e clique em "Próximo passo" para entrar.',
       'Sem conta ainda? Clique em "Criar conta" para se cadastrar.',
     ],
     signup: {
-      title: 'Cadastro em 2 etapas',
-      fields: ['1. Cadastro familiar do responsável', '2. Cadastro do paciente'],
-      note: 'Seus dados seguem sob Protocolo de Segurança Ativo.',
+      title: 'Cadastro familiar',
+      fields: ['Nome completo', 'E-mail', 'Senha'],
+      note: 'Depois de preencher os dados, confirme os termos de uso para concluir o cadastro. O vínculo com o paciente é feito pelo profissional clínico responsável, pelo Portal Clínico.',
     },
   },
 ]
