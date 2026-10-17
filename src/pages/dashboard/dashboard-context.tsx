@@ -10,36 +10,19 @@ import {
 import {
   acknowledgeAlerts,
   listPatientAlerts,
-  listPatients,
   type BackendPatient,
   type PatientAlert,
 } from '../../lib/backendApi'
+import { usePatientSelection } from '../../hooks/usePatientSelection'
 
 // As telas clínicas falam sempre de UM paciente, mas até agora não havia
 // essa noção em lugar nenhum: cada tela mostrava um paciente fictício
-// fixo. O paciente escolhido vive aqui e é lembrado entre visitas, pra
-// quem acompanha a mesma pessoa não ter que reescolher a cada acesso.
+// fixo. O paciente escolhido vive aqui e é lembrado entre visitas — ver
+// hooks/usePatientSelection, que carrega essa lógica (compartilhada com
+// o portal familiar, ver portal-patient-context.tsx). Cada portal usa
+// sua PRÓPRIA chave de localStorage — nunca a mesma — senão escolher um
+// paciente aqui mudaria silenciosamente o que o portal familiar mostra.
 const SELECTED_PATIENT_KEY = 'mindspeak_dashboard_patient'
-
-function readStoredPatientId(): number | null {
-  try {
-    const raw = localStorage.getItem(SELECTED_PATIENT_KEY)
-    if (!raw) return null
-    const parsed = Number(raw)
-    return Number.isInteger(parsed) ? parsed : null
-  } catch {
-    return null
-  }
-}
-
-function storePatientId(id: number | null) {
-  try {
-    if (id === null) localStorage.removeItem(SELECTED_PATIENT_KEY)
-    else localStorage.setItem(SELECTED_PATIENT_KEY, String(id))
-  } catch {
-    // modo privado / cota cheia: a escolha só não sobrevive ao reload.
-  }
-}
 
 type Ctx = {
   patients: BackendPatient[]
@@ -60,46 +43,20 @@ type Ctx = {
 const DashboardCtx = createContext<Ctx | null>(null)
 
 export function DashboardProvider({ children }: { children: ReactNode }) {
-  const [patients, setPatients] = useState<BackendPatient[]>([])
-  const [patientsLoading, setPatientsLoading] = useState(true)
-  const [patientsError, setPatientsError] = useState<string | null>(null)
-  const [selectedId, setSelectedId] = useState<number | null>(() => readStoredPatientId())
+  const {
+    patients,
+    selectedPatient,
+    selectPatient,
+    loading: patientsLoading,
+    error: patientsError,
+  } = usePatientSelection(SELECTED_PATIENT_KEY)
+  const selectedId = selectedPatient?.id ?? null
 
   const [alerts, setAlerts] = useState<PatientAlert[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [alertsLoading, setAlertsLoading] = useState(false)
   const [alertsError, setAlertsError] = useState<string | null>(null)
   const [alertsNonce, setAlertsNonce] = useState(0)
-
-  useEffect(() => {
-    let cancelled = false
-    listPatients()
-      .then((list) => {
-        if (cancelled) return
-        setPatients(list)
-        // Sem escolha salva (ou apontando pra um paciente que saiu da
-        // lista), cai no primeiro em vez de deixar a tela vazia.
-        setSelectedId((current) => {
-          if (current !== null && list.some((p) => p.id === current)) return current
-          return list[0]?.id ?? null
-        })
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setPatientsError(error instanceof Error ? error.message : 'Falha ao carregar pacientes.')
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setPatientsLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    storePatientId(selectedId)
-  }, [selectedId])
 
   useEffect(() => {
     if (selectedId === null) {
@@ -146,16 +103,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     reloadAlerts()
   }, [selectedId, reloadAlerts])
 
-  const selectedPatient = useMemo(
-    () => patients.find((p) => p.id === selectedId) ?? null,
-    [patients, selectedId],
-  )
-
   const value = useMemo<Ctx>(
     () => ({
       patients,
       selectedPatient,
-      selectPatient: setSelectedId,
+      selectPatient,
       patientsLoading,
       patientsError,
       alerts,
@@ -169,6 +121,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     [
       patients,
       selectedPatient,
+      selectPatient,
       patientsLoading,
       patientsError,
       alerts,
