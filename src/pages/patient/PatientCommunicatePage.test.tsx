@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -205,5 +205,48 @@ describe('PatientCommunicatePage — tecla A em sessão ao vivo', () => {
     await user.keyboard('a')
 
     expect(api.triggerFallbackConfirm).not.toHaveBeenCalled()
+  })
+
+  it('ao receber o anúncio, destaca o card pelo word_id — não pelo scanningIndex local', async () => {
+    // scanningIndex fica em 0 (Água) o tempo todo; o evento de fala anuncia
+    // o id 2 (Banheiro). Regressão: antes, o card destacado vinha de
+    // scanningIndexRef.current (o índice LOCAL deste dispositivo), que pode
+    // já ter divergido do que o backend realmente confirmou — sobretudo
+    // relevante pra confirmação manual, que pode chegar num dispositivo
+    // diferente do que apertou a tecla (operador no PC, iPad só exibindo).
+    useLiveSessionMock.mockReturnValue({
+      status: 'open',
+      sessionDbId: 123,
+      patientId: 1,
+      words: [
+        { id: 1, text: 'Água', severity: 'informativo', position: 1 },
+        { id: 2, text: 'Banheiro', severity: 'informativo', position: 2 },
+      ],
+      scanningIndex: 0,
+      focusLevel: 40,
+      signalQuality: 100,
+      candidateWord: 'Água',
+      confidence: 0.4,
+      paused: false,
+      uncertain: false,
+      lastSelected: null,
+      spokenHistory: [],
+    })
+    const user = userEvent.setup()
+    renderPage(['/patient/communicate?session=sess-ipad-003'])
+    await user.click(screen.getByRole('button', { name: /iniciar sessão ao vivo/i }))
+
+    const onSpeak = useLiveSessionMock.mock.calls.at(-1)?.[1]
+    expect(onSpeak).toBeTypeOf('function')
+    act(() => {
+      onSpeak?.({ wordId: '2', text: 'Banheiro', confidence: 0.9, at: new Date().toISOString() })
+    })
+
+    const overlay = await screen.findByRole('alertdialog', { name: /confirma/i })
+    expect(overlay).toHaveTextContent('Banheiro')
+
+    const cards = screen.getAllByRole('listitem')
+    expect(cards[1]).toHaveAttribute('aria-current', 'step') // Banheiro, não Água
+    expect(cards[0]).not.toHaveAttribute('aria-current')
   })
 })

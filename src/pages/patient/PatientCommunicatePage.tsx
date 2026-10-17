@@ -14,7 +14,7 @@ import { getPhraseVisual } from './patientPhraseIcons'
 import { getPatientSession } from '../../lib/patientSession'
 import { getPatientPreferences } from '../../lib/patientPreferences'
 import { isSpeechSupported, listVoices, primeSpeech, speakTextAI } from '../../lib/speech'
-import { skipToNextWord, triggerFallbackConfirm } from '../../lib/backendApi'
+import { skipToNextWord, triggerFallbackConfirm, type BackendWord } from '../../lib/backendApi'
 import { incrementTodaySelectionCount } from '../../lib/patientStats'
 import { MindSpeakLogo } from '../../components/brand/MindSpeakLogo'
 import { Button } from '../../components/shared/Button'
@@ -97,6 +97,11 @@ export function PatientCommunicatePage() {
   // Lidos só dentro do handler de tecla, que é registrado uma vez: precisam
   // do valor do render atual, não do que existia quando o listener subiu.
   const displayWordsRef = useRef<string[]>([])
+  // Igual a 'live.words', mas acessível de dentro de handleSpeakEvent sem
+  // precisar que o callback seja recriado a cada mudança de lista — ver uso
+  // logo abaixo, pra resolver qual card destacar por word_id, não por
+  // índice local (que pode já ter avançado quando o evento chega).
+  const liveWordsRef = useRef<BackendWord[]>([])
   const scanningIndexRef = useRef(0)
   const isHighlightingRef = useRef(false)
   // Cada confirmação tem um número; os timers de limpeza só agem se ainda
@@ -167,11 +172,21 @@ export function PatientCommunicatePage() {
     [],
   )
 
-  // O 'speak' do backend não traz índice, só o texto — o motor confirma a
-  // palavra que estava sendo varrida, então o índice corrente é o dela.
+  // Resolve o card a destacar pelo word_id que veio no evento, não pelo
+  // scanningIndex local deste dispositivo: os dois podem já ter divergido
+  // no instante em que o 'speak' chega (um live_status seguinte pode ter
+  // avançado a varredura aqui um instante antes), e isso fica mais visível
+  // ainda com a confirmação manual (tecla "A"): o evento pode chegar num
+  // dispositivo DIFERENTE do que apertou a tecla (ex.: operador no PC,
+  // iPad só exibindo) — sem usar o id, o iPad podia "confirmar" o card
+  // errado enquanto falava o texto certo. Cai pro índice local só se o id
+  // não bater com nada na grade atual (não devia acontecer; guarda só pra
+  // nunca travar a tela por causa disto).
   const handleSpeakEvent = useCallback(
-    (event: { text: string; confidence: number }) => {
-      applyConfirmation(scanningIndexRef.current, event.text, { fromSensor: true })
+    (event: { wordId: string; text: string; confidence: number }) => {
+      const byId = liveWordsRef.current.findIndex((w) => String(w.id) === event.wordId)
+      const index = byId >= 0 ? byId : scanningIndexRef.current
+      applyConfirmation(index, event.text, { fromSensor: true })
     },
     [applyConfirmation],
   )
@@ -183,6 +198,7 @@ export function PatientCommunicatePage() {
     [isLive, live.words, phrases],
   )
   displayWordsRef.current = displayWords
+  liveWordsRef.current = live.words
 
   useEffect(() => {
     const sync = () => setPhrases(getEightPhrases())

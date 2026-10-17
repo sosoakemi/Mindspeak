@@ -7,9 +7,9 @@
  *    hostname .local
  *    — o app assume que o backend está no mesmo host, na porta 8000.
  * 2) Demo pública (Vercel + backend hospedado à parte, ex. Render/Railway):
- *    aberto por um domínio público (ex. mindspeak-test.vercel.app) — não
- *    tem PC nem sensor nenhum do outro lado, então usa VITE_API_BASE_URL
- *    (a URL do backend na nuvem, só com simulador).
+ *    aberto por um domínio público (mindspeak-tcc.vercel.app) — não tem
+ *    PC nem sensor nenhum do outro lado, então usa VITE_API_BASE_URL (a
+ *    URL do backend na nuvem, só com simulador).
  *
  * A escolha entre os dois é automática, pelo hostname de onde a página foi
  * aberta — não pela variável de ambiente estar definida ou não. Isso

@@ -7,6 +7,7 @@ import { getAccessToken } from '../lib/authSession'
 export type ConnectionStatus = 'idle' | 'connecting' | 'open' | 'closed'
 
 export type SpokenEntry = {
+  wordId: string
   text: string
   confidence: number
   /** ISO string */
@@ -92,7 +93,7 @@ const RECONNECT_MAX_MS = 15000
  */
 export function useLiveSession(
   sessionId: string | null,
-  onSpeak?: (event: { text: string; confidence: number }) => void,
+  onSpeak?: (event: SpokenEntry) => void,
 ): LiveSessionState {
   const [state, setState] = useState<LiveSessionState>(INITIAL_STATE)
   const onSpeakRef = useRef(onSpeak)
@@ -132,6 +133,7 @@ export function useLiveSession(
           patientId: session.patient_id,
           words,
           spokenHistory: selectionsPage.items.map((selection) => ({
+            wordId: String(selection.word_id),
             text: selection.utterance,
             confidence: selection.confidence,
             at: selection.selected_at,
@@ -192,6 +194,7 @@ export function useLiveSession(
           }))
         } else if (message.type === 'speak') {
           const entry: SpokenEntry = {
+            wordId: message.word_id,
             text: message.text,
             confidence: message.confidence,
             at: new Date().toISOString(),
