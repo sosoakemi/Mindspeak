@@ -242,35 +242,6 @@ export function MonitorPage() {
           </ResponsiveContainer>
         </div>
       </section>
-
-      <section className="grid gap-6 lg:grid-cols-3">
-        {[
-          { k: 'Córtex motor', v: '1,24 µV', s: 'Estabilidade excelente', tone: 'teal' },
-          { k: 'Sinal alfa', v: '85% match', s: 'Foco cognitivo médio', tone: 'blue' },
-          { k: 'Latência neural', v: '14 ms', s: 'Tempo de resposta nominal', tone: 'violet' },
-        ].map((c) => (
-          <article key={c.k} className="rounded-2xl border border-ms-border bg-ms-surface p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-ms-muted">{c.k}</p>
-            <p className="mt-3 text-2xl font-semibold text-ms-primary">{c.v}</p>
-            <p className="mt-2 text-sm text-ms-secondary">{c.s}</p>
-            <div className="mt-4 flex h-10 items-end gap-1">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className={
-                    c.tone === 'teal'
-                      ? 'flex-1 rounded-sm bg-teal-400/80'
-                      : c.tone === 'blue'
-                        ? 'flex-1 rounded-sm bg-blue-400/80'
-                        : 'flex-1 rounded-sm bg-violet-400/80'
-                  }
-                  style={{ height: `${30 + ((i * 11) % 55)}%` }}
-                />
-              ))}
-            </div>
-          </article>
-        ))}
-      </section>
     </div>
   )
 }
