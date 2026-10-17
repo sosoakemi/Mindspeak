@@ -25,6 +25,23 @@ const SCROLL_HEIGHT_VH = 380
 // como suavização sem parecer que o vídeo está atrasado.
 const SMOOTHING = 0.35
 
+// Rede instável larga um `error` no <video> sem nenhum motivo permanente
+// (conexão caiu no meio do download de um arquivo de ~4MB, por exemplo —
+// bem plausível em wifi de evento/apresentação). Sem retry, essa falha
+// transitória virava definitiva: `videoFailed` nunca mais voltava a
+// false, e a seção inteira ficava presa na imagem estática pro resto da
+// visita — "não continua" por mais que a pessoa role a página, mesmo a
+// rede já tendo se recuperado. MAX_LOAD_RETRIES tenta de novo antes de
+// desistir de vez.
+const MAX_LOAD_RETRIES = 2
+const RETRY_DELAY_MS = 1500
+// Se nem onLoadedMetadata nem onError disparam dentro deste tempo (modo
+// economia de dados do navegador tratando preload="auto" como "none", por
+// exemplo), força uma nova tentativa em vez de ficar esperando pra
+// sempre — mesmo sintoma do caso acima (fallback permanente), causa
+// diferente (nunca chega a falhar, só nunca termina de carregar).
+const LOAD_TIMEOUT_MS = 8000
+
 type PinState = 'before' | 'pinned' | 'after'
 
 // O vídeo original (render 3D) vinha com fundo branco/preto de estúdio, não
@@ -62,6 +79,38 @@ export function PrototypeScrollVideo() {
   const [pinState, setPinState] = useState<PinState>('before')
   const [videoReady, setVideoReady] = useState(false)
   const [videoFailed, setVideoFailed] = useState(false)
+  // Precisa ser state (não ref): o watchdog abaixo depende dele pra saber
+  // quando reiniciar o relógio a cada nova tentativa — um ref mutado não
+  // dispara re-render, então o efeito nunca rearmaria pra 2ª tentativa.
+  const [retryAttempt, setRetryAttempt] = useState(0)
+
+  // Agenda uma nova tentativa de carregar o vídeo (rede falhou ou travou
+  // sem nunca terminar) até MAX_LOAD_RETRIES; depois disso, desiste pra
+  // valer e mostra o fallback estático — aí sim definitivo, não mais
+  // reavaliado enquanto este componente existir.
+  const scheduleRetryOrGiveUp = () => {
+    setRetryAttempt((attempt) => {
+      if (attempt >= MAX_LOAD_RETRIES) {
+        setVideoFailed(true)
+        return attempt
+      }
+      setTimeout(() => {
+        videoRef.current?.load()
+      }, RETRY_DELAY_MS)
+      return attempt + 1
+    })
+  }
+
+  // Watchdog de carregamento: se nem onLoadedMetadata nem onError
+  // chegarem a tempo (ver LOAD_TIMEOUT_MS — ex.: modo economia de dados
+  // tratando preload="auto" como "none"), trata como se tivesse falhado.
+  // Reinicia a cada retryAttempt, então cada nova tentativa ganha seu
+  // próprio prazo — sem isto, só a 1ª tentativa seria vigiada.
+  useEffect(() => {
+    if (videoReady || videoFailed) return
+    const timeout = setTimeout(scheduleRetryOrGiveUp, LOAD_TIMEOUT_MS)
+    return () => clearTimeout(timeout)
+  }, [videoReady, videoFailed, retryAttempt])
 
   // posição de scroll dentro da seção → estado de pin + progresso 0..1.
   // Progresso fica em ref (não re-renderiza a cada pixel de scroll);
@@ -188,7 +237,7 @@ export function PrototypeScrollVideo() {
             tabIndex={-1}
             className={`h-full w-full max-w-4xl object-contain transition-opacity duration-500 ${videoReady ? 'opacity-100' : 'opacity-0'}`}
             onLoadedMetadata={() => setVideoReady(true)}
-            onError={() => setVideoFailed(true)}
+            onError={scheduleRetryOrGiveUp}
           />
         ) : null}
 
