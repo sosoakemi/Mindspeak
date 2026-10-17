@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import {
+  AlertTriangle,
   Cpu,
   GraduationCap,
   Loader2,
@@ -33,6 +34,18 @@ import {
 } from '../../lib/backendApi'
 
 type Feedback = { kind: 'ok' | 'error'; text: string }
+
+// Mesma condição que train_patient_classifier aplica no backend (ver
+// ml_min_calibration_windows_per_class) — treinar mesmo assim ainda é
+// possível (é só um aviso, não bloqueia o botão), mas quem está prestes a
+// treinar precisa saber que esse paciente em particular pode ter um
+// modelo menos confiável, sem precisar adivinhar ou abrir o console.
+function belowCalibrationFloor(status: CalibrationStatus): boolean {
+  return (
+    status.foco_windows < status.min_windows_per_class ||
+    status.repouso_windows < status.min_windows_per_class
+  )
+}
 
 function FeedbackText({ feedback }: { feedback: Feedback | null }) {
   if (!feedback) return null
@@ -598,6 +611,15 @@ function CalibrationCard({
             Repouso: <strong className="text-ms-primary">{status?.repouso_windows ?? 0}</strong>
           </span>
         </div>
+        {status && status.total_windows > 0 && belowCalibrationFloor(status) ? (
+          <span
+            className="flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600"
+            title={`Mínimo recomendado: ${status.min_windows_per_class} janelas por classe (foco e repouso).`}
+          >
+            <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+            Calibração abaixo do recomendado
+          </span>
+        ) : null}
         <Button
           type="button"
           variant="primary"

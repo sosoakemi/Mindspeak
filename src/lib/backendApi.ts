@@ -92,6 +92,10 @@ export type CalibrationStatus = {
   total_windows: number
   foco_windows: number
   repouso_windows: number
+  // Mesmo piso que o backend aplica em train_patient_classifier — comparar
+  // contra isto em vez de um número fixo na tela, pra não desalinhar se o
+  // piso mudar do lado do servidor.
+  min_windows_per_class: number
 }
 
 export type TrainResponse = {

@@ -49,6 +49,7 @@ beforeEach(() => {
     total_windows: 0,
     foco_windows: 0,
     repouso_windows: 0,
+    min_windows_per_class: 20,
   })
 })
 
@@ -137,6 +138,41 @@ describe('PatientsPage', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Iniciar captura de foco' })).toBeInTheDocument(),
     )
+  })
+
+  it('avisa quando a calibração está abaixo do piso recomendado', async () => {
+    api.listPatients.mockResolvedValue([patientA])
+    api.listDevices.mockResolvedValue([deviceA])
+    api.getCalibrationStatus.mockResolvedValue({
+      patient_id: 1,
+      total_windows: 25,
+      foco_windows: 20,
+      repouso_windows: 5, // abaixo do piso — é isto que deve disparar o aviso
+      min_windows_per_class: 20,
+    })
+
+    render(<PatientsPage />)
+
+    await screen.findByRole('heading', { name: 'Paciente A' })
+    expect(await screen.findByText('Calibração abaixo do recomendado')).toBeInTheDocument()
+  })
+
+  it('não avisa quando a calibração atinge o piso recomendado nas duas classes', async () => {
+    api.listPatients.mockResolvedValue([patientA])
+    api.listDevices.mockResolvedValue([deviceA])
+    api.getCalibrationStatus.mockResolvedValue({
+      patient_id: 1,
+      total_windows: 44,
+      foco_windows: 22,
+      repouso_windows: 22,
+      min_windows_per_class: 20,
+    })
+
+    render(<PatientsPage />)
+
+    await screen.findByRole('heading', { name: 'Paciente A' })
+    await waitFor(() => expect(api.getCalibrationStatus).toHaveBeenCalled())
+    expect(screen.queryByText('Calibração abaixo do recomendado')).not.toBeInTheDocument()
   })
 
   it('não deixa iniciar captura sem uma sessão informada', async () => {
