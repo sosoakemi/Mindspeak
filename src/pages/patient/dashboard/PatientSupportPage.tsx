@@ -29,7 +29,7 @@ const FAQ = [
 // um retorno que nunca viria. Trocado por orientação real: falar com o
 // profissional responsável, levando os dados do dispositivo logo abaixo.
 export function PatientSupportPage() {
-  const { formatLastSync, sensorConnected } = usePatientSync()
+  const { formatLastSync, backendReachable } = usePatientSync()
   const session = getPatientSession()
 
   return (
@@ -92,9 +92,9 @@ export function PatientSupportPage() {
             <dd className="text-right font-medium text-ms-primary">TGAM NeuroSky</dd>
           </div>
           <div className="flex justify-between gap-4 border-b border-ms-border-subtle pb-3">
-            <dt className="text-ms-muted">Conexão</dt>
+            <dt className="text-ms-muted">Backend</dt>
             <dd className="text-right font-medium text-ms-primary">
-              {sensorConnected ? 'Serial USB · conectado' : 'Serial USB · desconectado'}
+              {backendReachable ? 'Acessível' : 'Não verificado'}
             </dd>
           </div>
           <div className="flex justify-between gap-4">
@@ -102,6 +102,11 @@ export function PatientSupportPage() {
             <dd className="text-right font-medium text-ms-primary">{formatLastSync()}</dd>
           </div>
         </dl>
+        <p className="mt-4 text-xs leading-relaxed text-ms-muted">
+          "Backend" aqui é só o servidor que recebe os dados — não informa se o sensor está
+          fisicamente ligado ao computador. Quem confirma isso é o profissional responsável,
+          olhando o computador onde o sensor está conectado.
+        </p>
       </section>
     </div>
   )

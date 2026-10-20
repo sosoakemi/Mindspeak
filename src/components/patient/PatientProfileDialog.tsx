@@ -13,7 +13,7 @@ type PatientProfileDialogProps = {
 export function PatientProfileDialog({ open, onClose }: PatientProfileDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const session = getPatientSession()
-  const { formatLastSync, sensorConnected } = usePatientSync()
+  const { formatLastSync, backendReachable } = usePatientSync()
 
   useEffect(() => {
     const el = dialogRef.current
@@ -67,19 +67,27 @@ export function PatientProfileDialog({ open, onClose }: PatientProfileDialogProp
           <dd className="text-right font-medium text-ms-primary">{formatLastSync()}</dd>
         </div>
         <div className="flex justify-between gap-4">
-          <dt className="text-ms-muted">Sensor</dt>
+          <dt className="text-ms-muted">Backend</dt>
           <dd className="text-right font-semibold text-ms-primary">
-            {sensorConnected ? (
+            {backendReachable ? (
               <span className="inline-flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
-                Conectado
+                Acessível
               </span>
             ) : (
-              <span className="text-ms-muted">Desconectado</span>
+              <span className="text-ms-muted">Não verificado</span>
             )}
           </dd>
         </div>
       </dl>
+      {/* O sensor físico não aparece aqui de propósito: nada que roda no
+          navegador tem como saber se ele está ligado — só se o backend
+          responde. Qualidade de sinal de verdade só existe DURANTE uma
+          sessão ao vivo, na própria tela de comunicação. */}
+      <p className="mt-2 text-[11px] leading-snug text-ms-muted">
+        "Backend acessível" não significa que o sensor está ligado — a qualidade do sinal
+        aparece na tela de Comunicação enquanto a sessão ao vivo estiver rodando.
+      </p>
 
       <div className="mt-6 flex flex-col gap-2 sm:flex-row">
         <LinkButton to="/patient/dashboard/palavras" variant="secondary" fullWidth onClick={onClose}>

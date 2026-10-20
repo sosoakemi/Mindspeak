@@ -52,13 +52,15 @@ function checkStatusSocket(sessionId: string, token: string): Promise<boolean> {
 export function usePatientSync() {
   const [status, setStatus] = useState<SyncStatus>('idle')
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(() => getPatientSession()?.lastSyncAt ?? null)
-  const [sensorConnected, setSensorConnected] = useState(() => getPatientSession()?.sensorConnected ?? false)
+  const [backendReachable, setBackendReachable] = useState(
+    () => getPatientSession()?.backendReachable ?? false,
+  )
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const refresh = useCallback(() => {
     const s = getPatientSession()
     setLastSyncAt(s?.lastSyncAt ?? null)
-    setSensorConnected(s?.sensorConnected ?? false)
+    setBackendReachable(s?.backendReachable ?? false)
   }, [])
 
   useEffect(() => {
@@ -82,7 +84,7 @@ export function usePatientSync() {
       setErrorMessage(
         'Nenhuma sessão ao vivo conectada ainda — informe o id da sessão na tela de Comunicação.',
       )
-      patchPatientSession({ sensorConnected: false })
+      patchPatientSession({ backendReachable: false })
       return
     }
 
@@ -90,26 +92,26 @@ export function usePatientSync() {
     if (!token) {
       setStatus('error')
       setErrorMessage('Sua sessão de login expirou. Faça login novamente.')
-      patchPatientSession({ sensorConnected: false })
+      patchPatientSession({ backendReachable: false })
       return
     }
 
     setStatus('syncing')
     setErrorMessage(null)
 
-    const connected = await checkStatusSocket(sessionId, token)
+    const reachable = await checkStatusSocket(sessionId, token)
 
-    if (!connected) {
+    if (!reachable) {
       setStatus('error')
       setErrorMessage(
         'Não foi possível conectar ao backend para esta sessão. Verifique se o servidor está no ar e se a sessão ainda existe.',
       )
-      patchPatientSession({ sensorConnected: false })
+      patchPatientSession({ backendReachable: false })
       return
     }
 
     const now = new Date().toISOString()
-    patchPatientSession({ lastSyncAt: now, sensorConnected: true })
+    patchPatientSession({ lastSyncAt: now, backendReachable: true })
     setStatus('success')
     window.setTimeout(() => setStatus((s) => (s === 'success' ? 'idle' : s)), 2500)
   }, [status])
@@ -130,7 +132,7 @@ export function usePatientSync() {
     status,
     errorMessage,
     lastSyncAt,
-    sensorConnected,
+    backendReachable,
     sync,
     formatLastSync,
     isSyncing: status === 'syncing',

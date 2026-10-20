@@ -7,7 +7,13 @@ export type PatientSessionPayload = {
   connectedAt: string
   /** ISO string — última sincronização bem-sucedida */
   lastSyncAt?: string
-  sensorConnected?: boolean
+  /** O "sync" só abre e fecha um WebSocket pro backend (ver
+   * hooks/usePatientSync.ts) — confirma que o BACKEND está alcançável
+   * daqui, nada sobre o sensor físico estar ligado ou plugado em algum
+   * computador. Nome antigo (`sensorConnected`) afirmava isso sem checar
+   * nada — achado em teste real: aparecia "Sincronizado"/"Sensor
+   * conectado" com o sensor literalmente desligado da tomada. */
+  backendReachable?: boolean
 }
 
 export const PATIENT_SESSION_CHANGED_EVENT = 'mindspeak-patient-session-changed'
@@ -46,7 +52,7 @@ export function getPatientSession(): PatientSessionPayload | null {
       patientName: o.patientName,
       connectedAt: o.connectedAt,
       lastSyncAt: typeof o.lastSyncAt === 'string' ? o.lastSyncAt : undefined,
-      sensorConnected: typeof o.sensorConnected === 'boolean' ? o.sensorConnected : undefined,
+      backendReachable: typeof o.backendReachable === 'boolean' ? o.backendReachable : undefined,
     }
   } catch {
     return null
