@@ -22,12 +22,14 @@ const patientA: backendApi.BackendPatient = {
   organization_id: 10,
   display_name: 'Paciente A',
   external_ref: null,
+  voice_preference: null,
 }
 const patientB: backendApi.BackendPatient = {
   id: 2,
   organization_id: 10,
   display_name: 'Paciente B',
   external_ref: null,
+  voice_preference: null,
 }
 
 const STORAGE_KEY = 'test_patient_selection_key'

@@ -30,6 +30,7 @@ const patientA: backendApi.BackendPatient = {
   organization_id: 10,
   display_name: 'Paciente A',
   external_ref: null,
+  voice_preference: null,
 }
 
 const deviceA: backendApi.BackendDevice = {
@@ -69,6 +70,7 @@ describe('PatientsPage', () => {
       organization_id: 10,
       display_name: 'Novo Paciente',
       external_ref: null,
+      voice_preference: null,
     })
     const user = userEvent.setup()
     render(<PatientsPage />)

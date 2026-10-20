@@ -24,6 +24,7 @@ const paciente = {
   organization_id: 1,
   display_name: 'Paciente Teste',
   external_ref: null,
+  voice_preference: null,
 }
 
 const sessao: backendApi.BackendSession = {

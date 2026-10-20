@@ -60,6 +60,11 @@ export type BackendPatient = {
   organization_id: number
   display_name: string
   external_ref: string | null
+  // 'feminina' | 'masculina' | null — null = sem preferência (cai no
+  // fallback local de cada navegador). Fica no paciente, não no
+  // navegador: clínico e familiar ficam em aparelhos diferentes e
+  // precisam concordar na MESMA voz pra sessão ao vivo de verdade.
+  voice_preference: AiVoiceName | null
 }
 
 export type BackendDevice = {
@@ -454,27 +459,30 @@ export function getPatientReadings(patientId: number, limit = 120): Promise<Read
   return getJson(`/patients/${patientId}/readings?limit=${limit}`)
 }
 
-export function listOrganizationWords(): Promise<BackendWord[]> {
-  return getJson('/words')
-}
-
-// A grade de um paciente, na ordem da varredura. Existe separado de
-// listOrganizationWords porque aquele é só para equipe clínica; este o
-// familiar vinculado e o próprio paciente conseguem ler.
+// A grade é do PACIENTE, não da organização inteira (migração
+// a1b2c3d4e5f6) — dois pacientes da mesma clínica já tinham histórico de
+// seleção nas mesmas palavras compartilhadas antes disso, e editar a
+// grade de um mudava a do outro junto. Clínico (mesma organização) e
+// familiar vinculado podem ler e editar — authorize_patient_access cobre
+// os dois papéis no backend.
 export function listPatientWords(patientId: number): Promise<BackendWord[]> {
   return getJson(`/patients/${patientId}/words`)
 }
 
-export function createWord(text: string, severity: WordSeverity): Promise<BackendWord> {
-  return postJson('/words', { text, severity }, true)
+export function createWord(
+  patientId: number,
+  text: string,
+  severity: WordSeverity,
+): Promise<BackendWord> {
+  return postJson(`/patients/${patientId}/words`, { text, severity }, true)
 }
 
-export function reorderWords(orderedIds: number[]): Promise<BackendWord[]> {
-  return putJson('/words/order', { ordered_ids: orderedIds })
+export function reorderWords(patientId: number, orderedIds: number[]): Promise<BackendWord[]> {
+  return putJson(`/patients/${patientId}/words/order`, { ordered_ids: orderedIds })
 }
 
-export async function deleteWord(wordId: number): Promise<void> {
-  const response = await fetch(`${getApiBaseUrl()}/words/${wordId}`, {
+export async function deleteWord(patientId: number, wordId: number): Promise<void> {
+  const response = await fetch(`${getApiBaseUrl()}/patients/${patientId}/words/${wordId}`, {
     method: 'DELETE',
     headers: authHeaders(),
   })
@@ -483,8 +491,23 @@ export async function deleteWord(wordId: number): Promise<void> {
   }
 }
 
-export function updateWordSeverity(wordId: number, severity: WordSeverity): Promise<BackendWord> {
-  return patchJson(`/words/${wordId}`, { severity })
+export function updateWordSeverity(
+  patientId: number,
+  wordId: number,
+  severity: WordSeverity,
+): Promise<BackendWord> {
+  return patchJson(`/patients/${patientId}/words/${wordId}`, { severity })
+}
+
+// Voz de IA usada quando a sessão ao vivo fala uma frase confirmada —
+// clínico ou familiar vinculado podem mudar (mesma autorização das
+// frases acima). null = volta a cair no fallback local de voz de cada
+// navegador.
+export function updatePatientVoice(
+  patientId: number,
+  voicePreference: AiVoiceName | null,
+): Promise<BackendPatient> {
+  return patchJson(`/patients/${patientId}/voice`, { voice_preference: voicePreference })
 }
 
 export type DecisionConfig = {
