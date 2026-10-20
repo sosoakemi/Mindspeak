@@ -74,6 +74,7 @@ function PatientDashboardShell() {
   const location = useLocation()
   const session = getPatientSession()
   const { open, close, openSidebar } = useMobileSidebar()
+  const { patient } = usePortalPatient()
 
   useEffect(() => {
     if (!getPatientSession()) {
@@ -211,7 +212,7 @@ function PatientDashboardShell() {
           </button>
           <div className="flex min-w-0 items-center gap-3">
             <PortalPatientPicker />
-            <PatientHeaderActions />
+            <PatientHeaderActions patientId={patient?.id ?? null} />
           </div>
         </header>
         <main className={cn('flex-1 overflow-x-hidden overflow-y-auto', msMainPad)}>
